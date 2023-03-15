@@ -22,7 +22,7 @@ class BSIDH():
         self.F = GF(self.p**4)
         i = sqrt(self.F(-1))
 
-        self.E = EllipticCurve(self.F, [0, 6, 0, 1, 0]) # Alice will starte på E
+        self.E = self.E_a(self.F, 6)
         print("Starting curve: ", self.E)
 
         assert self.E.is_supersingular()
@@ -31,8 +31,8 @@ class BSIDH():
         self.P_A, self.Q_A = [sqrt(self.E.order())/(self.M)*K for K in self.E.gens()]
         self.P_B, self.Q_B = [sqrt(self.E.order())/(self.N)*K for K in self.E.gens()]
 
-        assert self.P_A.order() == self.Q_A.order() == self.M # == 64
-        assert self.P_B.order() == self.Q_B.order() == self.N # == 63
+        assert self.P_A.order() == self.Q_A.order() == self.M
+        assert self.P_B.order() == self.Q_B.order() == self.N
 
         print("Alice Factors: ", factor(self.M))
         print("Bobs Factors: ", factor(self.N))
@@ -40,7 +40,7 @@ class BSIDH():
     def derive_alice(self, k_A, pub_key_bob):
         (E_B, B_P_A, B_Q_A) = pub_key_bob
         B_S_A = B_P_A + k_A*B_Q_A
-        ϕs_A= self.computeCompositionIsogeny(E_B, B_S_A, self.M)
+        ϕs_A= self.compute_isogeny_composition_chain(E_B, B_S_A, self.M)
         return ϕs_A.codomain().j_invariant()
 
     def key_gen_alice(self):
@@ -50,7 +50,7 @@ class BSIDH():
             que, r = self.M.quo_rem(S_A.order())
             if r == 0:
                 break
-        ϕ_A = self.computeCompositionIsogeny(self.E, S_A, self.M)
+        ϕ_A = self.compute_isogeny_composition_chain(self.E, S_A, self.M)
 
         pub_key_alice = (ϕ_A.codomain(), ϕ_A(self.P_B), ϕ_A(self.Q_B))
         print("Alice public key", pub_key_alice[0].j_invariant())
@@ -64,9 +64,8 @@ class BSIDH():
             if r == 0:
                 break
 
-        ϕ_B = self.computeCompositionIsogeny(self.E, S_B, self.N)
+        ϕ_B = self.compute_isogeny_composition_chain(self.E, S_B, self.N)
         
-        # Bobs public key
         pub_key_bob = (ϕ_B.codomain(), ϕ_B(self.P_A), ϕ_B(self.Q_A))
         print("Bobs public key", pub_key_bob[0].j_invariant())
         return [k_B, pub_key_bob]
@@ -74,34 +73,30 @@ class BSIDH():
     def derive_bob(self, k_B, pub_key_alice):
         (E_A, A_P_B, A_Q_B) = pub_key_alice
         A_S_B = A_P_B + k_B*A_Q_B
-        ϕs_B = self.computeCompositionIsogeny(E_A, A_S_B, self.N)
+        ϕs_B = self.compute_isogeny_composition_chain(E_A, A_S_B, self.N)
         return ϕs_B.codomain().j_invariant()
 
     def E_a(self, F, a):
         return EllipticCurve(F, [0, a, 0, 1, 0])
 
-    def computeCompositionIsogeny(self, E, S, order):
+    def compute_isogeny_composition_chain(self, E, S, order):
         factors = list(factor(order))
         ϕs = None
-        index = 0
         E_tmp = E
         S_tmp = S
-        while True: 
-            try:   
-                factors[index]
-            except IndexError:
-                """ List out of range """
-                break
-            ϕs, E_tmp, S_tmp = self.computeIsogeny(E_tmp, S_tmp, factors[index][0], factors[index][1], ϕs, order)
-            index = index + 1
+
+        for l, e in factors:
+            ϕs, E_tmp, S_tmp = self.compute_l_isogeny_chain(E_tmp, S_tmp, l, e, ϕs, order)
+            
         return ϕs
 
-    def computeIsogeny(self, E, S, l, e, ϕs, order):
-        print("computing ", e, " isogenies of degree", l)
+    def compute_l_isogeny_chain(self, E, S, l, e, ϕs, order):
+        print("Computing ", e, " isogenies of degree", l)
         S_tmp = S
         E_tmp = E
         order_tmp = order
-        for k in range(e):
+
+        for _ in range(e):
             order_tmp = order_tmp/l
             R_tmp = S_tmp
             R_tmp = order_tmp*R_tmp
