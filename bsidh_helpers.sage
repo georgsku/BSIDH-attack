@@ -1,4 +1,9 @@
 import itertools
+def generate_distortion_map(E):
+    if E.a_invariants() != (0,6,0,1,0):
+        raise NotImplementedError
+    return E.isogeny(E.lift_x(ZZ(1)), codomain=E)
+    
 def find_u_v(c):
     u = 0
     v = 0
@@ -33,40 +38,28 @@ def find_valid_c(M, N):
             N_tmp = factors_N.list_of_exponents_to_factors(exp_after_subtract_N)
             C = M_tmp - N_tmp
             if C % 4 == 1 and C > 1:
-                print(C, exp_after_subtract_N)
                 u, v = find_u_v(C)
                 if u and v:
                     print("Found something! with C: ",C,", u: ",u, " and v; ",v,", and list: ", exp_after_subtract_N, "and ", factor(M_tmp) )
                     return C, M_tmp, N_tmp, reduce((lambda x, y: x + y), M_list[a]), reduce((lambda x, y: x + y), N_list[b]),  u, v, N / N_tmp
 
-def get_inverse(M, n):
-    y = 1
-    while True:
-        if M/n * y % n == 1:
-            return y
-        y += 1
-
-def computeCompositionIsogeny(E, S, order):
+def compute_isogeny_composition_chain(E, S, order):
     factors = list(factor(order))
     ϕs = None
-    index = 0
     E_tmp = E
     S_tmp = S
-    while True: 
-        try:   
-            factors[index]
-        except IndexError:
-            """ List out of range """
-            break
-        ϕs, E_tmp, S_tmp = computeIsogeny(E_tmp, S_tmp, factors[index][0], factors[index][1], ϕs, order)
-        index = index + 1
+
+    for l, e in factors:
+        ϕs, E_tmp, S_tmp = compute_l_isogeny_chain(E_tmp, S_tmp, l, e, ϕs, order)
+        
     return ϕs
 
-def computeIsogeny(E, S, l, e, ϕs, order):
+def compute_l_isogeny_chain(E, S, l, e, ϕs, order):
     S_tmp = S
     E_tmp = E
     order_tmp = order
-    for k in range(e):
+
+    for _ in range(e):
         order_tmp = order_tmp/l
         R_tmp = S_tmp
         R_tmp = order_tmp*R_tmp
@@ -87,7 +80,6 @@ class Factors:
         self.factors = factor(num)
         self.list = list(factor(num))
         self.list_length = len(list(factor(num)))
-
 
     def get_number_of_factors(self):
         number_of_factors = 0 

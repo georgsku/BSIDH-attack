@@ -1,8 +1,5 @@
-from public_values_aux import *
-
 load('castryck_decru_attack_bsidh.sage')
 load('bsidh.sage')
-load('bsidh_helpers.sage')
 
 p = 8191
 M = 2**12
@@ -13,7 +10,6 @@ bobs_factors = Factors(N)
 
 a = Alices_factors.get_number_of_factors()
 b = bobs_factors.get_number_of_factors()
-
 
 sidh = BSIDH(p, M, N)
 

@@ -4,8 +4,6 @@ from helpers import possibly_parallel
 import itertools
 
 load('richelot_aux.sage')
-load('uvtable.sage')
-load('speedup.sage')
 load('bsidh_helpers.sage')
 load('CRTrepresentasjon.sage')
 
@@ -20,7 +18,6 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
     factorOrder = {}
     recoveredSizeFactor = {}
     for l, e in factor(N):
-        print(l,e)
         ks[l**e] = -1  #-1 means not yet recovered (no need to initialize this, other than readability)
         factorOrder[l] = e
         recoveredSizeFactor[l] = 0
@@ -34,7 +31,7 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
     Ms, ys = genCRTconstants(N)
 
     while recoveredSize != N:
-        print("remainingOrderN", factor(remainingOrderN))
+        print("Remaining order:", factor(remainingOrderN))
         _, remainingOrderM, remainingOrderN, alpha_i, beta_i, u, v, order = find_valid_c(remainingOrderM, remainingOrderN)
         
         ai = ai - alpha_i
@@ -42,7 +39,7 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
         alp = a - ai
         facOrder = factor(order)
 
-        print(f"Determination of first {beta_i} digits. We are working with 2^{ai}-torsion.")
+        print(f"Determination of the next {beta_i} digits. We are working with 2^{ai}-torsion.")
 
         @possibly_parallel(num_cores)
         def CheckGuess(ki):
@@ -66,11 +63,11 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
 
         guesses = list(itertools.product(*guesses))
         
-        print("guesses", guesses)
+        print("We will try the following digits", guesses)
         for result in CheckGuess(guesses):
             ((ki,), _), is_split = result
             if is_split is not None:
-                print("Glue-and-split! These are most likely the secret digits.")
+                print("Glue-and-split! These are most likely the secret digits.", ki)
                 print(ki)
                 for i,k in enumerate(ki):
                     ks[facOrder[i][0]] = k
@@ -89,17 +86,16 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
         if (len(list(factor(remainingOrderN))) == 1):
             break
 
-    print(f"Determination of last 1 ternary digits. We are brute-forcing this.")
+    print(f"Determination of last 1 CRT digit. We are brute-forcing this.")
     
     def CheckGuess(i):
-        print(i)
         recoveredPart = recPart(recoveredSize, ks, Ms, ys)
         scalar = i * Ms[remainingOrderN**factorOrder[remainingOrderN]][recoveredSizeFactor[remainingOrderN]] * ys[remainingOrderN ** factorOrder[remainingOrderN]]
         bobskey = (recoveredPart + scalar) % N
-        print(bobskey)
+        print(i, bobskey)
 
         bobs_S_B = P3 + bobskey*Q3
-        ϕ_B = computeCompositionIsogeny(E_start, bobs_S_B, N)
+        ϕ_B = compute_isogeny_composition_chain(E_start, bobs_S_B, N)
         return ϕ_B.codomain().j_invariant() == EB.j_invariant()
 
     for i in range(9):

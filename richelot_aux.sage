@@ -464,7 +464,6 @@ def AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i, degree = 3):
     This is used to construct the curve C from E_start and we
     compute the image of the points P_c and Q_c
     """
-    print(degree)
     tauhatkernel_distort = u*tauhatkernel + v*two_i(tauhatkernel)
 
     C, tau_tilde = Pushing3Chain(E_start, tauhatkernel_distort, i, degree)

@@ -14,7 +14,6 @@ bobs_factors = Factors(N)
 a = Alices_factors.get_number_of_factors()
 b = bobs_factors.get_number_of_factors()
 
-
 sidh = BSIDH(p, M, N)
 
 alice_private_key, alice_pub_key = sidh.key_gen_alice()
