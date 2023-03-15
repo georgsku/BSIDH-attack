@@ -208,7 +208,6 @@ def FromJacToJac(h, D11, D12, D21, D22, a, powers=None):
     # (l, 2^l D1, 2^l D2) where l < a are increasing
     R,x = h.parent().objgen()
     Fp2 = R.base()
-
     #J = HyperellipticCurve(h).jacobian()
     D1 = (D11, D12)
     D2 = (D21, D22)
@@ -241,6 +240,7 @@ def FromJacToJac(h, D11, D12, D21, D22, a, powers=None):
     #assert 2^a*D1 == 0
     #assert 2^a*D2 == 0
     G3, r3 = h.quo_rem(G1 * G2)
+    print(r3)
     assert r3 == 0
 
     delta = Matrix(G.padded_list(3) for G in (G1,G2,G3))
@@ -374,12 +374,11 @@ def Does22ChainSplit(C, E, P_c, Q_c, P, Q, a):
     h, D11, D12, D21, D22, f = FromProdToJac(C, E, P_c, Q_c, P, Q, a)
     chain.append(f)
     next_powers = None
-    # print(f"order 2^{a-1} on hyp curve ...")
+    print(f"order 2^{a-1} on hyp curve ...")
     for i in range(1,a-2+1):
-        h, D11, D12, D21, D22, f, next_powers = FromJacToJac(
-            h, D11, D12, D21, D22, a-i, powers=next_powers)
+        h, D11, D12, D21, D22, f, next_powers = FromJacToJac(h, D11, D12, D21, D22, a-i, powers=next_powers)
         chain.append(f)
-        # print(f"order 2^{a - i - 1} on hyp curve {h}")
+        print(f"order 2^{a - i - 1} on hyp curve {h}")
     # now we are left with a quadratic splitting: is it singular?
     G1 = D11
     G2 = D21
@@ -398,36 +397,66 @@ def Does22ChainSplit(C, E, P_c, Q_c, P, Q, a):
 def OddCyclicSumOfSquares(n, factexpl, provide_own_fac):
     return NotImplemented
 
-def Pushing3Chain(E, P, i):
+def Pushing3Chain(E, P, i, degree = 3):
     """
     Compute chain of isogenies quotienting
     out a point P of order 3^i
 
     https://trac.sagemath.org/ticket/34239
     """
-    def rec(Q, k):
+    def rec(Q, k, degree):
+        "Staring Rec"
         assert k
         if k == 1:  # base case
-#            assert Q and not 3*Q
-            return [EllipticCurveIsogeny(Q.curve(), Q, degree=3, check=False)]
-
+            # assert Q and not 3*Q
+            return [EllipticCurveIsogeny(Q.curve(), Q, degree=degree, check=False)]
         k1 = int(k * .8 + .5)
         k1 = max(1, min(k-1, k1))  # clamp to [1, k-1]
 
         Q1 = 3^k1 * Q
-        L = rec(Q1, k-k1)
+        L = rec(Q1, k-k1, 3)
 
         Q2 = Q
         for psi in L:
             Q2 = psi(Q2)
-        R = rec(Q2, k1)
+        R = rec(Q2, k1, 3)
 
         return L + R
 
-    chain = rec(P, i)
+    chain = rec(P, i, degree)
+    return chain[-1].codomain(), chain
+def Pushing3ChainBSIDH(E, P, i, degree = 3):
+    """
+    Compute chain of isogenies quotienting
+    out a point P of order 3^i
+
+    https://trac.sagemath.org/ticket/34239
+    """
+    def rec(Q, k, degree):
+        "Staring Rec"
+        assert k
+        if k == 1:  # base case
+            # assert Q and not 3*Q
+            return [EllipticCurveIsogeny(Q.curve(), Q, degree=degree, check=False)]
+        factors = list(factor(degree))
+        k1 = int(k * .8 + .5)
+        k1 = max(1, min(k-1, k1))  # clamp to [1, k-1]
+
+        Q1 = factors[0][0]^k1 * Q
+        L = rec(Q1, k-k1, factors[1][0])
+
+        Q2 = Q
+        for psi in L:
+            Q2 = psi(Q2)
+        R = rec(Q2, k1, factors[0][0])
+
+        return L + R
+
+    chain = rec(P, i, degree)
     return chain[-1].codomain(), chain
 
-def AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i):
+
+def AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i, degree = 3):
     """
     Compute the distored  kernel using precomputed u,v and the
     automorphism two_i.
@@ -435,9 +464,10 @@ def AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i):
     This is used to construct the curve C from E_start and we
     compute the image of the points P_c and Q_c
     """
+    print(degree)
     tauhatkernel_distort = u*tauhatkernel + v*two_i(tauhatkernel)
 
-    C, tau_tilde = Pushing3Chain(E_start, tauhatkernel_distort, i)
+    C, tau_tilde = Pushing3Chain(E_start, tauhatkernel_distort, i, degree)
     def chain(P):
         Pc = u*P + v*two_i(P)
         for taut in tau_tilde:
