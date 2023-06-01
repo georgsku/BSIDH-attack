@@ -1,4 +1,8 @@
 set_verbose(-1)
+import time
+from sage.schemes.elliptic_curves.hom_velusqrt import EllipticCurveHom_velusqrt
+from avisogenies_sage import *
+load('helpers.sage')
 
 def FromProdToJac(C, E, P_c, Q_c, P, Q, a):
     Fp2 = C.base()
@@ -208,7 +212,8 @@ def FromJacToJac(h, D11, D12, D21, D22, a, powers=None):
     # (l, 2^l D1, 2^l D2) where l < a are increasing
     R,x = h.parent().objgen()
     Fp2 = R.base()
-    #J = HyperellipticCurve(h).jacobian()
+    J = HyperellipticCurve(h).jacobian()
+    
     D1 = (D11, D12)
     D2 = (D21, D22)
 
@@ -240,7 +245,8 @@ def FromJacToJac(h, D11, D12, D21, D22, a, powers=None):
     #assert 2^a*D1 == 0
     #assert 2^a*D2 == 0
     G3, r3 = h.quo_rem(G1 * G2)
-    print(r3)
+    if debug:
+        print(r3)
     assert r3 == 0
 
     delta = Matrix(G.padded_list(3) for G in (G1,G2,G3))
@@ -364,6 +370,86 @@ def FromJacToProd(G1, G2, G3):
 
     return isogeny, (E1, E2)
 
+def does_NN_chain_split(C_start, E, P_c, Q_c, P, Q, a):
+    """
+    Returns None if the chain does not split
+    or a tuple (chain of isogenies, codomain (E1, E2))
+    """
+    chain = []
+    # gluing step
+    h, D11, D12, D21, D22, f = FromProdToJac(C_start, E, P_c, Q_c, P, Q, a)
+
+    Fp4 = E.base()
+    R.<x> = Fp4[]
+    C = HyperellipticCurve(h)
+    J = C.jacobian()
+
+    def random_point_jac(C):
+        x_1 = Fp4.random_element()
+        while not h(x_1).is_square():
+            x_1 = Fp4.random_element()
+        y_1 = h(x_1).sqrt()
+
+        x_2 = Fp4.random_element()
+        while not h(x_2).is_square():
+            x_2 = Fp4.random_element()
+        y_2 = h(x_2).sqrt()
+        return J(C(x_1,y_1), C(x_2,y_2))
+
+    X = KummerVariety.from_curve(C)
+    """ P11 = C_start.random_point()
+    P12 = E.random_point()
+    #P11 = P11 * Integer(P11.order()/7)
+    #P12 = P12 * Integer(P12.order()/7)
+    #assert P11.order() == P12.order() == 7
+    x11, x12 = f((P11, P12))
+    JP1 = J(x11, x12)
+
+    P21 = C_start.random_point() 
+    P22 = E.random_point()
+    #P21 = P21 * Integer(P21.order()/7)
+    #P22 = P22 * Integer(P22.order()/7)
+    #assert P21.order() == P22.order() == 7
+    x21, x22 = f((P21, P22))
+    JP2 = J(x21, x22)
+
+    P31 = C_start.random_point()
+    P32 = E.random_point()
+    #P31 = P31 * Integer(P31.order()/7)
+    #P32 = P32 * Integer(P32.order()/7)
+    #assert P31.order() == P32.order() == 7
+    x31, x32 = f((P31, P32))
+    JP3 = J(x31, x32)
+
+    P41 = C_start.random_point() 
+    P42 = E.random_point() 
+    #P41 = P41 * Integer(P41.order()/7)
+    #P42 = P42 * Integer(P42.order()/7)
+    #assert P41.order() == P42.order() == 7
+    x41, x42 = f((P41, P42))
+    JP4 = J(x41, x42)
+    print(x11, x12)
+    print(x21, x22)
+    print(x31, x32)
+    print(x41, x42) """
+
+    B = [random_point_jac(C), random_point_jac(C), random_point_jac(C), random_point_jac(C)]
+
+    #assert JP1*7 == JP2*7 == JP3*7 == JP4*7 == J(0)
+
+    r = [1,1,1]
+    X = KummerVariety.from_curve(C)
+
+    R = [X(pt) for pt in [B[0] + r[0] * B[2] + r[1] * B[3], B[1] + r[1] * B[2] + r[2] * B[3]]]
+
+    raise 
+
+    tim = time.time()
+    fA, fR = X.isogeny(5, basis, basis, check=False)
+    print("5,5-isogeny took ", time.time() - tim)
+    
+    raise
+    
 def Does22ChainSplit(C, E, P_c, Q_c, P, Q, a):
     """
     Returns None if the chain does not split
@@ -372,13 +458,17 @@ def Does22ChainSplit(C, E, P_c, Q_c, P, Q, a):
     chain = []
     # gluing step
     h, D11, D12, D21, D22, f = FromProdToJac(C, E, P_c, Q_c, P, Q, a)
+
     chain.append(f)
     next_powers = None
-    print(f"order 2^{a-1} on hyp curve ...")
+    tim = time.time()
+    if debug:
+        print(f"order 2^{a-1} on hyp curve ...")
     for i in range(1,a-2+1):
         h, D11, D12, D21, D22, f, next_powers = FromJacToJac(h, D11, D12, D21, D22, a-i, powers=next_powers)
         chain.append(f)
-        print(f"order 2^{a - i - 1} on hyp curve {h}")
+        if debug:
+            print(f"order 2^{a - i - 1} on hyp curve {h}")
     # now we are left with a quadratic splitting: is it singular?
     G1 = D11
     G2 = D21
@@ -397,64 +487,67 @@ def Does22ChainSplit(C, E, P_c, Q_c, P, Q, a):
 def OddCyclicSumOfSquares(n, factexpl, provide_own_fac):
     return NotImplemented
 
-def Pushing3Chain(E, P, i, degree = 3):
+def Pushing3Chain(E, P, i):
     """
     Compute chain of isogenies quotienting
     out a point P of order 3^i
-
     https://trac.sagemath.org/ticket/34239
     """
-    def rec(Q, k, degree):
-        "Staring Rec"
+    def rec(Q, k):
         assert k
         if k == 1:  # base case
-            # assert Q and not 3*Q
-            return [EllipticCurveIsogeny(Q.curve(), Q, degree=degree, check=False)]
+#            assert Q and not 3*Q
+            return [EllipticCurveIsogeny(Q.curve(), Q, degree=3, check=False)]
+
         k1 = int(k * .8 + .5)
         k1 = max(1, min(k-1, k1))  # clamp to [1, k-1]
 
-        Q1 = 3^k1 * Q
-        L = rec(Q1, k-k1, 3)
+        Q1 = 3**k1 * Q
+        L = rec(Q1, k-k1)
 
         Q2 = Q
         for psi in L:
             Q2 = psi(Q2)
-        R = rec(Q2, k1, 3)
+        R = rec(Q2, k1)
 
         return L + R
 
-    chain = rec(P, i, degree)
+    chain = rec(P, i)
+    #print(chain)
     return chain[-1].codomain(), chain
-def Pushing3ChainBSIDH(E, P, i, degree = 3):
-    """
-    Compute chain of isogenies quotienting
-    out a point P of order 3^i
 
-    https://trac.sagemath.org/ticket/34239
-    """
-    def rec(Q, k, degree):
-        "Staring Rec"
-        assert k
+def PushingLChain(E, P, i, degree):
+    #print("Pushing L chain of total degree:", degree, "and factors", factor(degree))
+    def rec(Q, k, l):
         if k == 1:  # base case
-            # assert Q and not 3*Q
-            return [EllipticCurveIsogeny(Q.curve(), Q, degree=degree, check=False)]
-        factors = list(factor(degree))
-        k1 = int(k * .8 + .5)
-        k1 = max(1, min(k-1, k1))  # clamp to [1, k-1]
+            tim = time.time()
+            if (l > 300 or False):
+                curve_isogeny = EllipticCurveHom_velusqrt(Q.curve(), Q)
+                print("\t Finding isogeny of degree", l,"took using EllipticCurveHom_velusqrt", time.time() - tim)
+            else:
+                curve_isogeny = EllipticCurveIsogeny(Q.curve(), Q, degree=l, check=False)
+                print("\t Finding isogeny of degree", l,"took using EllipticCurveIsogeny", time.time() - tim)
+            return [curve_isogeny]
+        
+        factors = factor(l)
+        choose_one_factor =  factors[0][0]
+        #print("All factors",factors, "choosing:", choose_one_factor)
 
-        Q1 = factors[0][0]^k1 * Q
-        L = rec(Q1, k-k1, factors[1][0])
-
-        Q2 = Q
+        Q1 = Q * choose_one_factor
+        
+        L = rec(Q1, k-1, l/choose_one_factor)
+        
+        Q2 = Q 
         for psi in L:
             Q2 = psi(Q2)
-        R = rec(Q2, k1, factors[0][0])
-
+        R = rec(Q2, 1, choose_one_factor)
+        
         return L + R
 
-    chain = rec(P, i, degree)
+    factors = Factors(degree)
+    chain = rec(P, factors.get_number_of_factors(), degree)
+    #print(chain)
     return chain[-1].codomain(), chain
-
 
 def AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i, degree = 3):
     """
@@ -465,8 +558,12 @@ def AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i, degree = 3):
     compute the image of the points P_c and Q_c
     """
     tauhatkernel_distort = u*tauhatkernel + v*two_i(tauhatkernel)
+    
+    if running_scheme == "SIDH":
+        C, tau_tilde = Pushing3Chain(E_start, tauhatkernel_distort, i)
+    else:
+        C, tau_tilde = PushingLChain(E_start, tauhatkernel_distort, i, degree)
 
-    C, tau_tilde = Pushing3Chain(E_start, tauhatkernel_distort, i, degree)
     def chain(P):
         Pc = u*P + v*two_i(P)
         for taut in tau_tilde:

@@ -1,2 +1,7 @@
 **/.DS_Store
 **.sage.py
+test*.sage
+3_3_isogenies
+avisogenies_sage
+creating_good_key.sage
+finding_isogenies_time.sage

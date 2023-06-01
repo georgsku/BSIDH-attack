@@ -6,17 +6,17 @@ from sage.rings.all import Integer
 load('richelot_aux.sage')
 load('helpers.sage')
 load('speedup.sage')
+load('uvtable_example_2.sage')
 
 # ===================================
 # =====  ATTACK  ====================
 # ===================================
 
 integer_types = (int, Integer)
+guessing_times = []
 
 def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
     tim = time.time()
-
-    finding_u_v_time = 0
 
     ks = {}
     factorOrder = {}
@@ -26,27 +26,34 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
         factorOrder[l] = e
         recoveredSizeFactor[l] = 0
 
-    recoveredSize = 1
-    remainingOrderM = M
-    remainingOrderN = N
-    ai = a
-    bi = b
-
     Ms, ys = genCRTconstants(N)
 
-    while recoveredSize != N:
+    recoveredSize = 1
+    remainingOrderN = N
+    ai = a
+    alp = M
+    uv_step = 0
+    guessing_number_step = 0
+    
+    while uv_step < len(uvtable):
         print("Remaining order:", factor(remainingOrderN))
 
-        t0 = time.time()
+        ai, order, u, v = uvtable[uv_step]
+        remainingOrderN = remainingOrderN/order
+        beta_i = len(factor(order))
 
-        _, remainingOrderM, remainingOrderN, alpha_i, beta_i, u, v, order,  = find_valid_c(remainingOrderM, remainingOrderN)
-
-        ai = ai - alpha_i
-        bi = bi - beta_i
         alp = a - ai
         facOrder = factor(order)
 
-        print(f"Determination of the next {beta_i} digits.")
+        print("From uvtable:")
+        print("u:", u, "v:", v)
+        print("revovering:", facOrder)
+
+        tuple  = find_valid_c(2^ai, remainingOrderN*order)
+        print(find_u_v(2^ai - remainingOrderN))
+        print(tuple)
+
+        print(f"Determination of the next {beta_i} digits. We are working with 2^{ai}", "torsion")
         
         @possibly_parallel(num_cores)
         def CheckGuess(digits):
@@ -55,9 +62,9 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
             scalar = recPart(recoveredSize, ks, Ms, ys)
             recoveredSizeTmp = recoveredSize
             step = 0
-            for l, e in facOrder:
-                for i in range(e):
-                    m, y = get_CRT_values(l, Ms, ys, recoveredSizeTmp, N)       
+            for l, e in facOrder:   
+                for _ in range(e):
+                    m, y = get_CRT_values(l, Ms, ys, recoveredSizeTmp, N)
                     recoveredSizeTmp *= l
                     if isinstance(digits, integer_types + (Integer,)):
                         scalar += digits * m * y
@@ -73,24 +80,24 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
             C, P_c, Q_c, _ = AuxiliaryIsogeny(beta_i, u, v, E_start, P2, Q2, tauhatkernel, two_i, order * recoveredSize)
             print("\t AuxiliaryIsogenyTime:", time.time() - AuxiliaryIsogenyTime)
             assert P_c.order() == M
-            print(C.montgomery_model())
-            print(P_c)
-            print(Q_c)
             Does22ChainSplitTime = time.time()
             result = Does22ChainSplit(C, EB, 2^alp*P_c, 2^alp*Q_c, 2^alp*PB, 2^alp*QB, ai)
             print("\t Does22ChainSplitTime:", time.time() - Does22ChainSplitTime)
-
+            tot_guess_time =  time.time() - total_guess_time
+            guessing_times.append([tot_guess_time, order])
             print("\t Guessing took:", time.time() - total_guess_time)
             return result
 
         guesses = create_guesses(order)
         for result in CheckGuess(guesses):
             ((digits,), _), is_split = result
+            print(result)
             if is_split and is_split != 'NO DATA':
                 print("\n--- ---")
                 print("Glue-and-split! These are most likely the secret digits.", digits)
                 print("--- ---\n")
                 ki_pos = 0
+                guessing_number_step += 1
                 for l, e in facOrder:
                     for i in range(e):
                         for key in ks:
@@ -113,11 +120,9 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
 
         print("I have found these CRT digits:",ks)
         print("Beginning new round! \n")
-        rem = Factors(remainingOrderN)
-        if (rem.get_number_of_factors() <= 1):
-            break
+        uv_step += 1
 
-    print(f"Determination of last #{rem.get_number_of_factors()} CRT digits. We are brute-forcing this.")
+    print(f"Determination of last 1 CRT digits. We are brute-forcing this.")
 
     @possibly_parallel(num_cores)
     def CheckGuess(ki):
@@ -126,13 +131,11 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
         recoveredPart = recPart(recoveredSize, ks, Ms, ys)
         recoveredSizeTmp = recoveredSize
         
-        m, y = get_CRT_values(remainingOrderN, Ms, ys, recoveredSizeTmp, N)
-        if isinstance(ki, integer_types + (Integer,)):
-            scalar = ki * m * y
-        else:
-            scalar = ki[0] * Ms[remainingOrderN] * ys[remainingOrderN]
+        #m, y = get_CRT_values(remainingOrderN, Ms, ys, recoveredSizeTmp, N)
+        scalar = ki * Ms[remainingOrderN] * ys[remainingOrderN]
         bobskey = (recoveredPart + scalar) % N
         bobscurve, _ = PushingLChain(E_start,  P3 + bobskey*Q3, a, N)
+        print(bobscurve)
         print("last_digit_guess_time", time.time() - last_digit_guess_time)
         return bobscurve.j_invariant() == EB.j_invariant()
     
@@ -155,12 +158,13 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
         print("Sorry, could not find the last digit...")
     
     if ks:
-        print(ks)
         key = recPart(N, ks, Ms, ys) % N
         print(f"Bob's secret key revealed as: {key}")
         print(f"Altogether this took {time.time() - tim} seconds.")
+        print(f"Individual guessing times where:", guessing_times)
         return ks
     else:
         print("Something went wrong.")
         print(f"Altogether this took {time.time() - tim} seconds.")
+        print(f"Individual guessing times where:", guessing_times)
         return None

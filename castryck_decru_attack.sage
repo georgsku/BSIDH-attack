@@ -1,10 +1,11 @@
+# Python imports
 import time
-from itertools import product
-from helpers import possibly_parallel
-
+# Load Sage Files
+load('helpers.sage')
 load('richelot_aux.sage')
-load('uvtable.sage')
 load('speedup.sage')
+load('uvtable.sage')
+# Load Sage Files
 
 # ===================================
 # =====  ATTACK  ====================
@@ -14,9 +15,9 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
     tim = time.time()
 
     skB = [] # TERNARY DIGITS IN EXPANSION OF BOB'S SECRET KEY
+
     # gathering the alpha_i, u, v from table
     expdata = [[0, 0, 0] for _ in range(b-3)]
-    
     for i in range(b%2, b-3, 2):
         index = (b-i) // 2
         row = uvtable[index-1]
@@ -28,6 +29,7 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
     while not expdata[bet1][0]:
         bet1 += 1
     bet1 += 1
+
     ai,u,v = expdata[bet1-1]
 
     print(f"Determination of first {bet1} ternary digits. We are working with 2^{ai}-torsion.")
@@ -38,20 +40,14 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
     @possibly_parallel(num_cores)
     def CheckGuess(first_digits):
         print(f"Testing digits: {first_digits}")
-        scalar = sum(3^k*d for k,d in enumerate(first_digits))
 
-        print("bi",bi)
-        print("ai",ai)
-        print("alp",alp)
+        scalar = sum(3^k*d for k,d in enumerate(first_digits))
         tauhatkernel = 3^bi * (P3 + scalar*Q3)
-        print(factor(tauhatkernel.order()))
-        print(tauhatkernel.order())
+
         tauhatkernel_distort = u*tauhatkernel + v*two_i(tauhatkernel)
 
         C, P_c, Q_c, _ = AuxiliaryIsogeny(bet1, u, v, E_start, P2, Q2, tauhatkernel, two_i)
-        print("C",C)
-        print("P_c", factor(P_c.order()))
-        print("PB", factor(PB.order()))
+
         return Does22ChainSplit(C, EB, 2^alp*P_c, 2^alp*Q_c, 2^alp*PB, 2^alp*QB, ai)
 
     guesses = [ZZ(i).digits(3, padto=bet1) for i in range(3^bet1-1)]
@@ -73,11 +69,11 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
     length = 1
     max_length = 0
     for i in range(bet1, b-3):
-        if expdata[i][0]:
-            max_length = max(length, max_length)
-            length = 0
-        else:
-            length += 1
+      if expdata[i][0]:
+        max_length = max(length, max_length)
+        length = 0
+      else:
+        length += 1
 
     while True:
         K = 2^a*3^(b - max_length)*EB.random_point()
@@ -111,7 +107,6 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
         print(f"Testing digit: {j}")
 
         scalar = sum(3^k*d for k,d in enumerate(skB + [j]))
-        
         tauhatkernel = 3^bi * (P3 + scalar*Q3)
 
         C, P_c, Q_c, _ = AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i)
@@ -171,15 +166,11 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores=1):
         @possibly_parallel(num_cores)
         def CheckGuess(j):
             print(f"Testing digit: {j}")
-            print(skB)
-            print(skB + [j])
+
             scalar = sum(3^k*d for k,d in enumerate(skB + [j]))
-            print(factor(scalar))
             tauhatkernel = 3^bi * (P3 + scalar * Q3)
-            print(factor(tauhatkernel.order()))
 
             C, P_c, Q_c, _ = AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i)
-            print("P_c", factor((P_c.order())))
 
             return Does22ChainSplit(C, endEB, 2^alp*P_c, 2^alp*Q_c, 2^alp*endPB, 2^alp*endQB, ai)
 
