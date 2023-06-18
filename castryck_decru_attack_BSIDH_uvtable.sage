@@ -13,7 +13,7 @@ load('uvtable_example_2.sage')
 # ===================================
 
 integer_types = (int, Integer)
-guessing_times = []
+
 
 def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
     tim = time.time()
@@ -49,10 +49,6 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
         print("u:", u, "v:", v)
         print("revovering:", facOrder)
 
-        tuple  = find_valid_c(2^ai, remainingOrderN*order)
-        print(find_u_v(2^ai - remainingOrderN))
-        print(tuple)
-
         print(f"Determination of the next {beta_i} digits. We are working with 2^{ai}", "torsion")
         
         @possibly_parallel(num_cores)
@@ -83,8 +79,6 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
             Does22ChainSplitTime = time.time()
             result = Does22ChainSplit(C, EB, 2^alp*P_c, 2^alp*Q_c, 2^alp*PB, 2^alp*QB, ai)
             print("\t Does22ChainSplitTime:", time.time() - Does22ChainSplitTime)
-            tot_guess_time =  time.time() - total_guess_time
-            guessing_times.append([tot_guess_time, order])
             print("\t Guessing took:", time.time() - total_guess_time)
             return result
 
@@ -161,10 +155,8 @@ def CastryckDecruAttack(E_start, P2, Q2, EB, PB, QB, two_i, num_cores):
         key = recPart(N, ks, Ms, ys) % N
         print(f"Bob's secret key revealed as: {key}")
         print(f"Altogether this took {time.time() - tim} seconds.")
-        print(f"Individual guessing times where:", guessing_times)
         return ks
     else:
         print("Something went wrong.")
         print(f"Altogether this took {time.time() - tim} seconds.")
-        print(f"Individual guessing times where:", guessing_times)
         return None

@@ -1,5 +1,5 @@
-load('castryck_decru_attack_bsidh.sage')
-#load('castryck_decru_attack_bsidh_uvtable.sage')
+#load('castryck_decru_attack_bsidh.sage')
+load('castryck_decru_attack_bsidh_uvtable.sage')
 load('bsidh.sage')
 load('uvtable_example_2.sage')
 

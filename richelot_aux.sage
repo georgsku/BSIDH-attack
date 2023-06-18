@@ -559,10 +559,8 @@ def AuxiliaryIsogeny(i, u, v, E_start, P2, Q2, tauhatkernel, two_i, degree = 3):
     """
     tauhatkernel_distort = u*tauhatkernel + v*two_i(tauhatkernel)
     
-    if running_scheme == "SIDH":
-        C, tau_tilde = Pushing3Chain(E_start, tauhatkernel_distort, i)
-    else:
-        C, tau_tilde = PushingLChain(E_start, tauhatkernel_distort, i, degree)
+    C, tau_tilde = PushingLChain(E_start, tauhatkernel_distort, i, degree)
+    #C, tau_tilde = Pushing3Chain(E_start, tauhatkernel_distort, i)
 
     def chain(P):
         Pc = u*P + v*two_i(P)
